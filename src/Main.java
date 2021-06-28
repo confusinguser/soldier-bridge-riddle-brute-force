@@ -2,23 +2,41 @@ import java.util.Arrays;
 
 public class Main {
 
-    private static final int bridgeLen = 5;
+    private static final int bridgeLen = 20;
     private static int currBridgeNum = -1; // Increases instantly in beginning of main
 
     public static void main(String[] args) {
+        int currentMaxAmountOfStepsBridgeNum = 0;
+        int currentMaxAmountOfSteps = 0;
         while (currBridgeNum < (1 << bridgeLen) - 1) { // same as 2^bridgeLen
             currBridgeNum++;
-            Cell[] bridge = generateBridge(currBridgeNum);
+            Cell[] bridge = generateBridge(currBridgeNum); // 1048574
             System.out.println(getBridgeAsString(bridge));
-            int i = 0;
+            int steps = 0;
             while (Arrays.stream(bridge).anyMatch(cell -> cell.getDirection() != Direction.NONE)) {
-                i++;
+                steps++;
                 advanceBridge(bridge);
                 System.out.println(getBridgeAsString(bridge));
-                if (i >= 100) break;
+                if (steps >= 200) break;
             }
-            System.out.println("-----------");
+            System.out.println("----------- " + currBridgeNum);
 
+            if (currentMaxAmountOfSteps < steps) {
+                currentMaxAmountOfStepsBridgeNum = currBridgeNum;
+                currentMaxAmountOfSteps = steps;
+            }
+
+        }
+
+        currBridgeNum = currentMaxAmountOfStepsBridgeNum;
+        Cell[] bridge = generateBridge(currBridgeNum);
+        System.out.println(getBridgeAsString(bridge));
+        int steps = 0;
+        while (Arrays.stream(bridge).anyMatch(cell -> cell.getDirection() != Direction.NONE)) {
+            steps++;
+            advanceBridge(bridge);
+            System.out.println(getBridgeAsString(bridge));
+            if (steps >= 300) break;
         }
     }
 
@@ -39,15 +57,11 @@ public class Main {
     }
 
     public static void advanceBridge(Cell[] bridge) {
-        Cell[] bridgeCopy = new Cell[bridge.length]; // One pass for colliding and one for walking (right, left separate passes from diff directions) and then a both cell colliding one, think about this configuration: -> -> -> <-, correct result after 1 tick: . -> ♢ ->
-
-        for (int i = 0; i < bridge.length; i++) { // For deep copy, update bridgeCopy after each pass
-            Cell cell = bridge[i];
-            bridgeCopy[i] = cell.copy();
-        }
+        // One pass for all colliding and one for walking (right, left separate passes from diff directions) and then a both cell colliding one for things that happened after walking, think about this configuration: -> -> -> <-, correct result after 1 tick: . -> ♢ ->
 
         for (int i = 0; i < bridge.length; i++) {
-            Cell cell = bridgeCopy[i];
+            Cell cell = bridge[i];
+            if (cell.isTicked()) continue;
 
             if (i == 0 && cell.getDirection() == Direction.LEFT) {
                 bridge[0].setDirection(Direction.NONE);
@@ -66,18 +80,23 @@ public class Main {
                 continue;
             }
 
-            if (cell.getDirection() == Direction.RIGHT && bridgeCopy[i + 1].getDirection() == Direction.LEFT) {
-                bridge[i].setDirection(Direction.LEFT);
+            if (i != 0 && i != bridge.length - 1 && cell.getDirection() == Direction.BOTH &&
+                    (bridge[i - 1].getDirection() == Direction.RIGHT || bridge[i - 1].getDirection() == Direction.BOTH) &&
+                    (bridge[i + 1].getDirection() == Direction.LEFT || bridge[i - 1].getDirection() == Direction.BOTH) &&
+                    !bridge[i - 1].isTicked() && !bridge[i + 1].isTicked()) { // For configurations like > ♢ <
                 bridge[i].setTicked(true);
-            } else if (cell.getDirection() == Direction.LEFT && bridgeCopy[i - 1].getDirection() == Direction.RIGHT) {
-                bridge[i].setDirection(Direction.RIGHT);
-                bridge[i].setTicked(true);
+                bridge[i - 1].setDirection(Direction.LEFT);
+                bridge[i - 1].setTicked(true);
+                bridge[i + 1].setDirection(Direction.RIGHT);
+                bridge[i + 1].setTicked(true);
             }
-        }
 
-        for (int i = 0; i < bridge.length; i++) { // For deep copy
-            Cell cell = bridge[i];
-            bridgeCopy[i] = cell.copy();
+            if (cell.getDirection() == Direction.RIGHT && bridge[i + 1].getDirection() == Direction.LEFT) {
+                bridge[i].setDirection(Direction.LEFT);
+                bridge[i + 1].setDirection(Direction.RIGHT);
+                bridge[i].setTicked(true);
+                bridge[i + 1].setTicked(true);
+            }
         }
 
         for (int i = 0; i < bridge.length; i++) { // Left walking pass
@@ -109,11 +128,6 @@ public class Main {
             }
         }
 
-        for (int i = 0; i < bridge.length; i++) { // For deep copy
-            Cell cell = bridge[i];
-            bridgeCopy[i] = cell.copy();
-        }
-
         // From bridge.len-1 to 1, so that all rights move in a chain instead of one every tick
         for (int i = bridge.length - 1; i >= 0; i--) { // Right walking pass
             Cell cell = bridge[i];
@@ -122,6 +136,7 @@ public class Main {
             if (cell.getDirection() == Direction.RIGHT) {
                 if (bridge[i + 1].getDirection() == Direction.NONE) {
                     bridge[i].setDirection(Direction.NONE);
+                    bridge[i + 1].setDirection(Direction.RIGHT);
                 }
                 if (bridge[i + 1].getDirection() == Direction.LEFT && bridge[i + 1].isTicked()) {
                     bridge[i].setDirection(Direction.NONE);
@@ -141,16 +156,16 @@ public class Main {
             }
         }
 
-        for (int i = 0; i < bridge.length; i++) { // Both colliding pass
-            Cell cell = bridgeCopy[i];
-            if (cell.getDirection() == Direction.RIGHT && i != bridge.length - 1 && bridgeCopy[i + 1].getDirection() == Direction.LEFT && !cell.isTicked() && !bridge[i + 1].isTicked()) {
-                bridge[i].setDirection(Direction.LEFT);
-                bridge[i].setTicked(true);
-            } else if (cell.getDirection() == Direction.LEFT && i > 0 && bridgeCopy[i - 1].getDirection() == Direction.RIGHT && !cell.isTicked() && !bridge[i + 1].isTicked()) {
-                bridge[i].setDirection(Direction.RIGHT);
-                bridge[i].setTicked(true);
-            }
-        }
+//        for (int i = 0; i < bridge.length; i++) { // Both colliding pass
+//            Cell cell = bridgeCopy[i];
+//            if (cell.getDirection() == Direction.RIGHT && i != bridge.length - 1 && bridgeCopy[i + 1].getDirection() == Direction.LEFT && !cell.isTicked() && !bridge[i + 1].isTicked()) {
+//                bridge[i].setDirection(Direction.LEFT);
+//                bridge[i].setTicked(true);
+//            } else if (cell.getDirection() == Direction.LEFT && i > 0 && bridgeCopy[i - 1].getDirection() == Direction.RIGHT && !cell.isTicked() && !bridge[i + 1].isTicked()) {
+//                bridge[i].setDirection(Direction.RIGHT);
+//                bridge[i].setTicked(true);
+//            }
+//        }
 
         for (Cell cell : bridge) {
             cell.setTicked(false);
